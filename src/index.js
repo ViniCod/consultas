@@ -1,20 +1,25 @@
-const express = require('express');
-//para enviar eventos para os demais microsserviços
-const axios = require('axios');
+const express = require("express");
 const app = express();
 app.use(express.json());
-app.post("/eventos", (req, res) => {
-    const evento = req.body;
-    //envia o evento para o microsserviço de lembretes
-    axios.post("http://localhost:4000/eventos", evento);
-    //envia o evento para o microsserviço de observações
-    axios.post("http://localhost:5000/eventos", evento);
-    //envia o evento para o microsserviço de consulta
-    axios.post("http://localhost:6000/eventos", evento);
-    res.status(200).send({
-        msg: "ok"
-    });
+const baseConsulta = {};
+const funcoes = {
+    LembreteCriado: (lembrete) => {
+        baseConsulta[lembrete.contador] = lembrete;
+    },
+    ObservacaoCriada: (observacao) => {
+        const observacoes =
+            baseConsulta[observacao.lembreteId]["observacoes"] || [];
+        observacoes.push(observacao);
+        baseConsulta[observacao.lembreteId]["observacoes"] =
+            observacoes;
+    }
+};
+
+app.get("/lembretes", (req, res) => {
+    res.status(200).send(baseConsulta);
 });
-app.listen(10000, () => {
-    console.log('Barramento de eventos. Porta 10000.')
-})
+app.post("/eventos", (req, res) => {
+    funcoes[req.body.tipo](req.body.dados);
+    res.status(200).send(baseConsulta);
+});
+app.listen(6000, () => console.log("Consultas. Porta 6000"));
